@@ -19,14 +19,35 @@ class _HomeScreenState extends State<HomeScreen> {
     Contact(name: 'Glovo', phone: '78556468'),
   ];
 
+  List<Contact> filteredContacts = [];
+  TextEditingController searchController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    filteredContacts = contacts;
+    searchController.addListener(_filterContacts);
+  }
+
+  void _filterContacts() {
+    String query = searchController.text.toLowerCase();
+    setState(() {
+      filteredContacts = contacts
+          .where((contact) =>
+              contact.name.toLowerCase().contains(query) ||
+              contact.phone.contains(query))
+          .toList();
+    });
+  }
+
   void _editContact(int index) {
     showModalBottomSheet(
       context: context,
       builder: (BuildContext context) {
         final _nameController =
-            TextEditingController(text: contacts[index].name);
+            TextEditingController(text: filteredContacts[index].name);
         final _phoneController =
-            TextEditingController(text: contacts[index].phone);
+            TextEditingController(text: filteredContacts[index].phone);
 
         return Padding(
           padding: const EdgeInsets.all(16.0),
@@ -41,29 +62,15 @@ class _HomeScreenState extends State<HomeScreen> {
                 controller: _phoneController,
                 decoration: InputDecoration(labelText: 'Edit Phone Number'),
               ),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  ElevatedButton(
-                    onPressed: () {
-                      setState(() {
-                        contacts[index].name = _nameController.text;
-                        contacts[index].phone = _phoneController.text;
-                      });
-                      Navigator.pop(context); // Close bottom sheet
-                    },
-                    child: Text('Save'),
-                  ),
-                  ElevatedButton(
-                    onPressed: () {
-                      setState(() {
-                        contacts.removeAt(index);
-                      });
-                      Navigator.pop(context); // Close bottom sheet
-                    },
-                    child: Text('Delete', style: TextStyle(color: Colors.red)),
-                  ),
-                ],
+              ElevatedButton(
+                onPressed: () {
+                  setState(() {
+                    filteredContacts[index].name = _nameController.text;
+                    filteredContacts[index].phone = _phoneController.text;
+                  });
+                  Navigator.pop(context);
+                },
+                child: Text('Save'),
               ),
             ],
           ),
@@ -73,7 +80,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _callContact(String phone) {
-    print('Calling $phone'); // In a real app, use url_launcher to make a call.
+    print('Calling $phone');
   }
 
   void _addContact() {
@@ -103,8 +110,9 @@ class _HomeScreenState extends State<HomeScreen> {
                       name: _nameController.text,
                       phone: _phoneController.text,
                     ));
+                    _filterContacts();
                   });
-                  Navigator.pop(context); // Close bottom sheet
+                  Navigator.pop(context);
                 },
                 child: Text('Add Contact'),
               ),
@@ -115,42 +123,72 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  void _confirmDeleteContact(int index) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text('Delete Contact'),
+          content: Text(
+              'Are you sure you want to delete ${filteredContacts[index].name}?'),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop(); // Close dialog
+              },
+              child: Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () {
+                setState(() {
+                  contacts.remove(filteredContacts[index]);
+                  _filterContacts(); // Refresh the filtered list
+                });
+                Navigator.of(context).pop(); // Close dialog
+              },
+              child: Text('Delete', style: TextStyle(color: Colors.red)),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text("Contacts"),
+        title: TextField(
+          controller: searchController,
+          decoration: InputDecoration(
+            hintText: 'Search contacts...',
+            border: InputBorder.none,
+          ),
+          style: TextStyle(color: const Color.fromARGB(255, 168, 49, 49)),
+        ),
       ),
       body: ListView.builder(
-        itemCount: contacts.length,
+        itemCount: filteredContacts.length,
         itemBuilder: (context, index) {
-          return Dismissible(
-            key: Key(contacts[index].name),
-            background: Container(
-              color: Colors.green,
-              alignment: Alignment.centerLeft,
-              padding: EdgeInsets.only(left: 16),
-              child: Icon(Icons.phone, color: Colors.white),
-            ),
-            secondaryBackground: Container(
-              color: Colors.blue,
-              alignment: Alignment.centerRight,
-              padding: EdgeInsets.only(right: 16),
-              child: Icon(Icons.edit, color: Colors.white),
-            ),
-            confirmDismiss: (direction) async {
-              if (direction == DismissDirection.startToEnd) {
-                _callContact(contacts[index].phone);
-                return false; // Prevent dismissal
-              } else if (direction == DismissDirection.endToStart) {
-                _editContact(index);
-                return false; // Prevent dismissal
-              }
-              return false; // Prevent dismissal in any case
-            },
-            child: ListTile(
-              title: Text(contacts[index].name),
-              subtitle: Text(contacts[index].phone),
+          return ListTile(
+            title: Text(filteredContacts[index].name),
+            subtitle: Text(filteredContacts[index].phone),
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                IconButton(
+                  icon: Icon(Icons.call, color: Colors.green),
+                  onPressed: () => _callContact(filteredContacts[index].phone),
+                ),
+                IconButton(
+                  icon: Icon(Icons.edit, color: Colors.blue),
+                  onPressed: () => _editContact(index),
+                ),
+                IconButton(
+                  icon: Icon(Icons.delete, color: Colors.red),
+                  onPressed: () => _confirmDeleteContact(index),
+                ),
+              ],
             ),
           );
         },
